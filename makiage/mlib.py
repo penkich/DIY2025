@@ -1,11 +1,12 @@
 from machine import Pin, I2C, SoftI2C, Timer
+import json
 import time
 i2c = I2C(0, scl=Pin(9), sda=Pin(8))
 import mcp23017 # Ｉ／Ｏエキスパンダー
 mcp = mcp23017.MCP23017(i2c, 0x20)
 
-LimitSW1U = Pin(21, Pin.IN) # 注意（2番めリレー動作）
-LimitSW1D = Pin(20, Pin.IN) # 注意（1番めリレー動作）
+LimitSWU = [Pin(21, Pin.IN), Pin(12, Pin.IN), Pin(26, Pin.IN), Pin(14, Pin.IN)] # 注意（2番めリレー動作）
+LimitSWD = [Pin(20, Pin.IN), Pin(11, Pin.IN), Pin(22, Pin.IN), Pin(13, Pin.IN)] # 注意（1番めリレー動作）
 
 f_pins = [mcp[8], mcp[10], mcp[12], mcp[14]] # モーター正転指示
 r_pins = [mcp[9], mcp[11], mcp[13], mcp[15]] # モーター反転指示
@@ -19,9 +20,14 @@ for r_pin in r_pins:
 
 class Motor:
     def __init__(self, n):
-        self.posmax = 700
+        self.conf_fname = "motor_cfg.py"
+        self.dic = self.load_dic()
+        self.nmotor = self.dic['nmotor']
+        self.posmax = self.dic['posmax'][n]
+        self.pos = self.dic['pos'][n]
+        self.LimitSWU = LimitSWU[n]
+        self.LimitSWD = LimitSWD[n]
         self.posmin = 0
-        self.pos = 0
         self.n = n
         self.tim = Timer()
         self.tim2 = Timer()
@@ -33,25 +39,22 @@ class Motor:
     def stop_f(self, dsec):
         self.dsec -= 1
         self.pos += 1
-        if (LimitSW1U.value() == 1 or self.dsec == 0) and self.flg:
+        if (self.LimitSWU.value() == 1 or self.dsec == 0) and self.flg:
             self.tim2.deinit()
             f_pins[self.n].value(0)
-            if LimitSW1U.value() == 1:
+            if self.LimitSWU.value() == 1:
                 self.pos -= 1
         self.flg = True
     def stop_r(self, c):
         self.dsec -= 1
         self.pos -= 1
-        if (LimitSW1D.value() == 1 or self.dsec == 0) and self.flg:
+        if (self.LimitSWD.value() == 1 or self.dsec == 0) and self.flg:
             self.tim2.deinit()
             r_pins[self.n].value(0)
-            if LimitSW1D.value() == 1:
+            if self.LimitSWD.value() == 1:
                 self.pos = 0
         self.flg = True
-    def chk_posmax(self):
-        return self.posmax
-    def chk_posmin(self):
-        return self.posmin
+
     def chk_pos(self):
         return self.pos
     def mov_f_irq(self, dsec):
@@ -82,22 +85,17 @@ class Motor:
         self.reset_relay()
         self.tim.deinit()
         self.pos -= dsec
-    def mov_start(self):
-        if self.pos != 0:
-            self.mov_r(self.pos)
-    def mov_end(self):
-        self.mov_f(self.posmax - self.pos)
 
     def stop_flimit(self, c):
         self.pos += 1
-        if LimitSW1U.value() == 1 and self.flg == True:
+        if self.LimitSWU.value() == 1 and self.flg == True:
             self.tim3.deinit()
             f_pins[self.n].value(0)
         self.flg = True
 
     def stop_rlimit(self, c):
         self.pos -= 1
-        if LimitSW1D.value() == 1 and self.flg == True:
+        if self.LimitSWD.value() == 1 and self.flg == True:
             self.tim3.deinit()
             r_pins[self.n].value(0)
             self.pos = 0
@@ -118,7 +116,7 @@ class Motor:
         f_pins[self.n].value(1)
         while True:
             time.sleep(0.01)
-            if LimitSW1U.value() == 1:
+            if self.LimitSWU.value() == 1:
                 if x > 1:
                     self.tim.deinit()
                     break
@@ -134,7 +132,7 @@ class Motor:
         r_pins[self.n].value(1)
         while True:
             time.sleep(0.01)
-            if LimitSW1D.value() == 1:
+            if self.LimitSWD.value() == 1:
                 if x > 1:
                     self.tim.deinit()
                     break
@@ -147,3 +145,20 @@ class Motor:
         f_pins[self.n].value(0)
         r_pins[self.n].value(0)
 
+    def load_dic(self):
+        f = open(self.conf_fname)
+        dic = json.loads(f.read())
+        f.close()
+        return dic
+
+    def save_dic(self):
+        f = open(self.conf_fname)
+        if (self.load_dic() != self.dic):
+            f.write(json.dumps(self.dic))
+        f.close()
+
+    def put_posmax(self):
+        self.dic['posmax'][self.n] = self.posmax
+
+    def put_pos(self):
+        self.dic['pos'][self.n] = self.pos
