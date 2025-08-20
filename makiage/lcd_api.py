@@ -186,6 +186,7 @@ class LcdApi:
     ###        
     def putstr_kana(self, string):
         for ch in string:
+            self.hal_sleep_us(120) # 念のため挿入
             if ch in self.kana:
                 if len(self.kana[ch]) ==1:
                     self.hal_write_data(self.kana[ch][0])
@@ -201,10 +202,10 @@ class LcdApi:
         """
         location &= 0x7
         self.hal_write_command(self.LCD_CGRAM | (location << 3))
-        self.hal_sleep_us(40)
+        self.hal_sleep_us(120) # pico2でコケたので40->120に変更
         for i in range(8):
             self.hal_write_data(charmap[i])
-            self.hal_sleep_us(40)
+            self.hal_sleep_us(120) # pico2でコケたので40->120に変更
         self.move_to(self.cursor_x, self.cursor_y)
 
     def hal_backlight_on(self):
@@ -240,3 +241,4 @@ class LcdApi:
     def hal_sleep_us(self, usecs):
         """Sleep for some time (given in microseconds)."""
         time.sleep_us(usecs)
+
