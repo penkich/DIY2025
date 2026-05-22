@@ -171,20 +171,22 @@ class Motor:
         r_pins[self.n].value(0)
 
     def load_dic(self):
-        f = open(self.conf_fname, "r")
-        try:
-            dic = json.loads(f.read())
-        except:
-            print(f"{self.n} load dic err")
-            return self.dic
-        f.close()
+        with open(self.conf_fname, "r") as f:
+            try:
+                dic = json.loads(f.read())
+            except:
+                print(f"{self.n} load dic err")
+                return self.dic
         return dic
 
     def save_dic(self):
-        f = open(self.conf_fname)
-        if (self.load_dic() != self.dic):
-            f.write(json.dumps(self.dic))
-        f.close()
+        with open(self.conf_fname, "r+") as f:
+            if (self.load_dic() != self.dic):
+                try:
+                    json.dumps(self.dic)
+                    f.write(json.dumps(self.dic))
+                except:
+                    return "err"
 
     def put_posmax(self):
         self.dic['posmax'] = self.posmax
@@ -215,5 +217,6 @@ class Motor:
             return True
         else:
             return False
+
 
 
