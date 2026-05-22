@@ -13,15 +13,13 @@ class Config:
         self.measure_span = self.dic['measure_span']
 
     def load_dic(self):
-        f = open(self.conf_fname, "r")
-        try:
-            dic = json.loads(f.read())
-            return dic
-        except:
-            lcd.print("Dic load Err")
-            time.sleep(2)
-        f.close()
-
+        with open(self.conf_fname, "r") as f:
+            try:
+                dic = json.loads(f.read())
+                return dic
+            except:
+                lcd.print("Dic load Err")
+                time.sleep(2)
 
     def save_dic(self):
         if (self.load_dic() != self.dic):
@@ -31,9 +29,8 @@ class Config:
                 lcd.print("Dic json Err")
                 time.sleep(2)
                 return
-            f = open(self.conf_fname)
-            f.write(json.dumps(self.dic))
-            f.close()
+            with open(self.conf_fname,"w") as f:
+                f.write(json.dumps(self.dic))
     
     def put_nmotor(self):
         self.dic['nmotor'] = self.nmotor
@@ -43,6 +40,7 @@ class Config:
 
     def put_measure_span(self):
         self.dic['measure_span'] = self.measure_span
+
 
 
 
