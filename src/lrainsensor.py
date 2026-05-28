@@ -85,3 +85,71 @@ class Rainsensor:
             print("成功: ヒーター停止温度差を 5℃ に設定しました。")
         else:
             print("失敗: 停止温度差の設定エラー")
+    
+    def set_sensitivity(self,value):
+        value = 100 - value # valueは、０～１００で設定する（大きい値程、感度が高い）
+        if not(0 <= value <= 100):
+            print("value error")
+            return -1
+        else:
+            sens_value = 500 + (value * 30) # 500（最高感度）～3500（最低感度）に変換
+            if self.write_register(0x0034, sens_value):
+                print(f"成功: 感度を{100-value}に設定しました。")
+                
+    def chk_rain(self):
+        frame = bytearray([SLAVE_ADDR, 0x03, 0x00, 0x00, 0x00, 0x01])
+        crc = crc16(frame)
+        frame.append(crc & 0xFF)
+        frame.append((crc >> 8) & 0xFF)
+    
+        while uart.any():
+            uart.read()
+        uart.write(frame)
+    
+        time.sleep_ms(150)
+    
+        if uart.any():
+            response = uart.read()
+            if len(response) >= 7:
+                rcv_crc = (response[-1] << 8) | response[-2]
+                cal_crc = crc16(response[:-2])
+                if rcv_crc != cal_crc:
+                    return None
+                status_val = (response[3] << 8) | response[4]
+                return status_val # 0:降ってない 1:降ってる
+        return None
+
+    def read_registers(self, start_addr, count):
+        """
+        複数レジスタを一括で読み出す
+        0030h:加熱上限温度
+        0031h:加熱開始温度x10（この温度以下なら加熱開始）
+        0032h:加熱温度差（この温度差以上で加熱中止）
+        0033h:発報までの時間（秒)
+        0034H:発報感度（500-3500 低い程高感度）
+        """
+        frame = bytearray([
+            SLAVE_ADDR, 0x03,
+            (start_addr >> 8) & 0xFF, start_addr & 0xFF,
+            (count >> 8) & 0xFF, count & 0xFF
+        ])
+        crc = crc16(frame)
+        frame.append(crc & 0xFF)
+        frame.append((crc >> 8) & 0xFF)
+    
+        while uart.any(): uart.read()
+        uart.write(frame)
+        time.sleep_ms(150)
+    
+        if uart.any():
+            res = uart.read()
+            if len(res) >= 5 + (count * 2):
+                values = []
+                for i in range(count):
+                    idx = 3 + (i * 2)
+                    val = (res[idx] << 8) | res[idx+1]
+                    # 符号付き16bit処理
+                    if val > 32767: val -= 65536
+                    values.append(val)
+                return values
+        return None
